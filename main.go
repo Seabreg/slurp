@@ -18,62 +18,85 @@
 package main
 
 import (
-    "github.com/aws/aws-sdk-go/aws"
-    log "github.com/sirupsen/logrus"
+	"fmt"
 
-    "slurp/scanner/external"
-    "slurp/scanner/cmd"
-    "slurp/scanner/intern"
+	"github.com/aws/aws-sdk-go/aws"
+	log "github.com/sirupsen/logrus"
+
+	"slurp/scanner/cmd"
+	"slurp/scanner/external"
+	"slurp/scanner/intern"
 )
 
 // Global config
 var cfg cmd.Config
 
 func main() {
-    cfg = cmd.Init("slurp", "Public buckets finder", "Public buckets finder")
+	cfg = cmd.Init("slurp", "Public buckets finder", "Public buckets finder")
 
-    switch cfg.State {
-    case "DOMAIN":
-        external.Init(&cfg)
+	switch cfg.State {
+	case "DOMAIN":
+		external.Init(&cfg)
 
-        log.Info("Building permutations....")
-        go external.PermutateDomainRunner(&cfg)
+		if !cfg.Generate {
+			log.Info("Building permutations....")
+			go external.PermutateDomainRunner(&cfg)
 
-        log.Info("Processing permutations....")
-        external.CheckDomainPermutations(&cfg)
+			log.Info("Processing permutations....")
+			external.CheckDomainPermutations(&cfg)
 
-        // Print stats info
-        log.Printf("%+v", cfg.Stats)
-    case "KEYWORD":
-        external.Init(&cfg)
+			// Print stats info
+			log.Printf("%+v", cfg.Stats)
+		} else {
+			log.Info("Building permutations....")
+			external.PermutateDomainRunner(&cfg)
 
-        log.Info("Building permutations....")
-        go external.PermutateKeywordRunner(&cfg)
+			permutations := external.GetDomainPermutations()
+			for item := range permutations {
+				fmt.Println(permutations[item])
+			}
+		}
 
-        log.Info("Processing permutations....")
-        external.CheckKeywordPermutations(&cfg)
+	case "KEYWORD":
+		external.Init(&cfg)
 
-        // Print stats info
-        log.Printf("%+v", cfg.Stats)
-    case "INTERNAL":
-        var config aws.Config
-        config.Region = &cfg.Region
+		if !cfg.Generate {
+			log.Info("Building permutations....")
+			go external.PermutateKeywordRunner(&cfg)
 
-        log.Info("Determining public buckets....")
-        buckets, err3 := intern.GetPublicBuckets(config)
-        if err3 != nil {
-            log.Error(err3)
-        }
+			log.Info("Processing permutations....")
+			external.CheckKeywordPermutations(&cfg)
 
-        for bucket := range buckets.ACL {
-            log.Infof("S3 public bucket (ACL): %s", buckets.ACL[bucket])
-        }
+			// Print stats info
+			log.Printf("%+v", cfg.Stats)
+		} else {
+			log.Info("Building permutations....")
+			external.PermutateKeywordRunner(&cfg)
 
-        for bucket := range buckets.Policy {
-            log.Infof("S3 public bucket (Policy): %s", buckets.Policy[bucket])
-        }
+			permutations := external.GetKeywordPermutations()
+			for item := range permutations {
+				fmt.Println(permutations[item])
+			}
+		}
+	case "INTERNAL":
+		var config aws.Config
+		config.Region = &cfg.Region
 
-    default:
-        log.Fatal("Check help")
-    }
+		log.Info("Determining public buckets....")
+		buckets, err3 := intern.GetPublicBuckets(config)
+		if err3 != nil {
+			log.Error(err3)
+		}
+
+		for bucket := range buckets.ACL {
+			log.Infof("S3 public bucket (ACL): %s", buckets.ACL[bucket])
+		}
+
+		for bucket := range buckets.Policy {
+			log.Infof("S3 public bucket (Policy): %s", buckets.Policy[bucket])
+		}
+
+	default:
+		log.Fatal("Check help")
+	}
 }

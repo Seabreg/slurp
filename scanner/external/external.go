@@ -180,6 +180,10 @@ func PermutateDomainRunner(cfg *cmd.Config) {
 	}
 
 	for {
+		if domainQ.Empty() {
+			break
+		}
+
 		dstruct, err := domainQ.Get(1)
 
 		if err != nil {
@@ -213,6 +217,44 @@ func PermutateKeywordRunner(cfg *cmd.Config) {
 				Permutation: pd[p],
 			})
 		}
+	}
+}
+
+// GetKeywordPermutations returns the permutations
+func GetKeywordPermutations() []string {
+	var permutations []string
+
+	for {
+		if permutatedQ.Empty() {
+			return permutations
+		}
+
+		dom, err := permutatedQ.Get(1)
+
+		if err != nil {
+			log.Error(err)
+		}
+
+		permutations = append(permutations, dom[0].(Keyword).Permutation)
+	}
+}
+
+// GetDomainPermutations returns the permutations
+func GetDomainPermutations() []string {
+	var permutations []string
+
+	for {
+		if permutatedQ.Empty() {
+			return permutations
+		}
+
+		dom, err := permutatedQ.Get(1)
+
+		if err != nil {
+			log.Error(err)
+		}
+
+		permutations = append(permutations, dom[0].(PermutatedDomain).Permutation)
 	}
 }
 

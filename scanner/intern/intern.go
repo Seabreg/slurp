@@ -18,195 +18,195 @@
 package intern
 
 import (
-    "encoding/json"
-    "strings"
-    "regexp"
+	"encoding/json"
+	"regexp"
+	"strings"
 
-    "github.com/aws/aws-sdk-go/aws"
-    "github.com/aws/aws-sdk-go/aws/awserr"
-    "github.com/aws/aws-sdk-go/aws/session"
-    "github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
 
-    "github.com/jmoiron/jsonq"
-    log "github.com/sirupsen/logrus"
+	"github.com/jmoiron/jsonq"
+	log "github.com/sirupsen/logrus"
 )
 
 // PublicBuckets stores a list of the public buckets either by ACL or by Policy
 type PublicBuckets struct {
-    ACL    []string
-    Policy []string
+	ACL    []string
+	Policy []string
 }
 
 // GetBuckets returns all of the buckets
 func GetBuckets(config aws.Config) ([]string, error) {
-    svc := s3.New(session.New(), &config)
-    input := &s3.ListBucketsInput{}
+	svc := s3.New(session.New(), &config)
+	input := &s3.ListBucketsInput{}
 
-    result, err := svc.ListBuckets(input)
-    if err != nil {
-        if aerr, ok := err.(awserr.Error); ok {
-            switch aerr.Code() {
-            default:
-                log.Error(aerr.Error())
-            }
-        } else {
-            // Print the error, cast err to awserr.Error to get the Code and
-            // Message from an error.
-            log.Error(err.Error())
-        }
-        return []string{}, err
-    }
+	result, err := svc.ListBuckets(input)
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			default:
+				log.Error(aerr.Error())
+			}
+		} else {
+			// Print the error, cast err to awserr.Error to get the Code and
+			// Message from an error.
+			log.Error(err.Error())
+		}
+		return []string{}, err
+	}
 
-    var buckets []string
+	var buckets []string
 
-    for bucket := range result.Buckets {
-        buckets = append(buckets, aws.StringValue(result.Buckets[bucket].Name))
-    }
+	for bucket := range result.Buckets {
+		buckets = append(buckets, aws.StringValue(result.Buckets[bucket].Name))
+	}
 
-    return buckets, nil
+	return buckets, nil
 }
 
 // OpenPolicy checks a policy to see if its "open"
-func OpenPolicy(policy *string) (bool) {
-    data := map[string]interface{}{}
-    dec := json.NewDecoder(strings.NewReader(aws.StringValue(policy)))
-    dec.Decode(&data)
-    jq := jsonq.NewQuery(data)
+func OpenPolicy(policy *string) bool {
+	data := map[string]interface{}{}
+	dec := json.NewDecoder(strings.NewReader(aws.StringValue(policy)))
+	dec.Decode(&data)
+	jq := jsonq.NewQuery(data)
 
-    effect, _ := jq.String("Statement", "0", "Effect")
-    principal, _ := jq.String("Statement", "0", "Principal")
-    action, _ := jq.String("Statement", "0", "Action")
+	effect, _ := jq.String("Statement", "0", "Effect")
+	principal, _ := jq.String("Statement", "0", "Principal")
+	action, _ := jq.String("Statement", "0", "Action")
 
-    re := regexp.MustCompile("(s3:Get\\*|s3:Describe\\*|s3:List\\*|s3:GetObject)")
+	re := regexp.MustCompile("(s3:Get\\*|s3:Describe\\*|s3:List\\*|s3:GetObject)")
 
-    if effect == "Allow" && principal == "*" && re.MatchString(action) {
-        return true
-    }
+	if effect == "Allow" && principal == "*" && re.MatchString(action) {
+		return true
+	}
 
-    return false
+	return false
 }
 
 // OpenACL checks an ACL to see if its "open"
-func OpenACL(grants []*s3.Grant) (bool) {
-    for grant := range grants {
-        //fmt.Println(aws.StringValue(grants[grant].Grantee.URI))
-        //fmt.Println(aws.StringValue(grants[grant].Permission))
+func OpenACL(grants []*s3.Grant) bool {
+	for grant := range grants {
+		//fmt.Println(aws.StringValue(grants[grant].Grantee.URI))
+		//fmt.Println(aws.StringValue(grants[grant].Permission))
 
-        re := regexp.MustCompile("(READ|WRITE|FULL_CONTROL)")
+		re := regexp.MustCompile("(READ|WRITE|FULL_CONTROL)")
 
-        if aws.StringValue(grants[grant].Grantee.URI) == "http://acs.amazonaws.com/groups/global/AllUsers" {
-            if re.MatchString(aws.StringValue(grants[grant].Permission)) {
-                return true
-            }
-        }
-    }
+		if aws.StringValue(grants[grant].Grantee.URI) == "http://acs.amazonaws.com/groups/global/AllUsers" {
+			if re.MatchString(aws.StringValue(grants[grant].Permission)) {
+				return true
+			}
+		}
+	}
 
-    return false
+	return false
 }
 
 // GetBucketRegion determines the region for a bucket
 func GetBucketRegion(config aws.Config, bucket string) string {
-    svc := s3.New(session.New(), &config)
-    input := &s3.GetBucketLocationInput{}
-    input.Bucket = aws.String(bucket)
+	svc := s3.New(session.New(), &config)
+	input := &s3.GetBucketLocationInput{}
+	input.Bucket = aws.String(bucket)
 
-    result, err := svc.GetBucketLocation(input)
-    if err != nil {
-        if aerr, ok := err.(awserr.Error); ok {
-            switch aerr.Code() {
-            case "AccessDenied":
-                log.Errorf("AccessDenied for bucket: %s (using default: %s)\n", bucket, aws.StringValue(config.Region))
-                return aws.StringValue(config.Region)
-            default:
-                log.Error(aerr.Error())
-            }
-        } else {
-            // Print the error, cast err to awserr.Error to get the Code and
-            // Message from an error.
-            log.Error(err.Error())
-        }
-    }
+	result, err := svc.GetBucketLocation(input)
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			case "AccessDenied":
+				log.Errorf("AccessDenied for bucket: %s (using default: %s)\n", bucket, aws.StringValue(config.Region))
+				return aws.StringValue(config.Region)
+			default:
+				log.Error(aerr.Error())
+			}
+		} else {
+			// Print the error, cast err to awserr.Error to get the Code and
+			// Message from an error.
+			log.Error(err.Error())
+		}
+	}
 
-    var region string
+	var region string
 
-    //log.Infof("%s %s", result.String(), bucket)
-    if strings.Contains(result.String(), "LocationConstraint") {
-        region = aws.StringValue(result.LocationConstraint)
-    } else {
-        //if getBucketLocation is null us-east-1 used
-        //http://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region
-        region = "us-east-1"
-    }
+	//log.Infof("%s %s", result.String(), bucket)
+	if strings.Contains(result.String(), "LocationConstraint") {
+		region = aws.StringValue(result.LocationConstraint)
+	} else {
+		//if getBucketLocation is null us-east-1 used
+		//http://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region
+		region = "us-east-1"
+	}
 
-    return region
+	return region
 }
 
 // GetPublicBuckets determines which buckets are public
 func GetPublicBuckets(config aws.Config) (PublicBuckets, error) {
-    var pubBucket PublicBuckets
+	var pubBucket PublicBuckets
 
-    buckets, err := GetBuckets(config)
-    if err != nil {
-        if aerr, ok := err.(awserr.Error); ok {
-            switch aerr.Code() {
-            default:
-                log.Error(aerr.Error())
-            }
-        } else {
-            // Print the error, cast err to awserr.Error to get the Code and
-            // Message from an error.
-            log.Error(err.Error())
-        }
-        return pubBucket, err
-    }
+	buckets, err := GetBuckets(config)
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			default:
+				log.Error(aerr.Error())
+			}
+		} else {
+			// Print the error, cast err to awserr.Error to get the Code and
+			// Message from an error.
+			log.Error(err.Error())
+		}
+		return pubBucket, err
+	}
 
-    for bucket := range buckets {
-        region := GetBucketRegion(config, buckets[bucket]) // Required or we will get BucketRegionError
-        svcTmp := s3.New(session.New(), &aws.Config{Region: aws.String(region)})
+	for bucket := range buckets {
+		region := GetBucketRegion(config, buckets[bucket]) // Required or we will get BucketRegionError
+		svcTmp := s3.New(session.New(), &aws.Config{Region: aws.String(region)})
 
-        input := &s3.GetBucketPolicyInput{}
-        input.Bucket = aws.String(buckets[bucket])
+		input := &s3.GetBucketPolicyInput{}
+		input.Bucket = aws.String(buckets[bucket])
 
-        result, err := svcTmp.GetBucketPolicy(input)
-        if err != nil {
-            if aerr, ok := err.(awserr.Error); ok {
-                switch aerr.Code() {
-                case "NoSuchBucketPolicy":
-                case "BucketRegionError":
-                    log.Errorf("%s: %s\n", buckets[bucket], aerr.Error())
-                case "AccessDenied":
-                    log.Errorf("AccessDenied for bucket: %s (skipping)\n", buckets[bucket])
-                    continue
-                case "AuthorizationHeaderMalformed":
-                    log.Errorf("AuthorizationHeaderMalformed for bucket: %s (%s)\n", buckets[bucket], aerr.Error())
-                default:
-                    log.Errorf("%s: %s\n", buckets[bucket], aerr.Error())
-                }
-            } else {
-                // Print the error, cast err to awserr.Error to get the Code and
-                // Message from an error.
-                log.Error(err.Error())
-            }
-        }
+		result, err := svcTmp.GetBucketPolicy(input)
+		if err != nil {
+			if aerr, ok := err.(awserr.Error); ok {
+				switch aerr.Code() {
+				case "NoSuchBucketPolicy":
+				case "BucketRegionError":
+					log.Errorf("%s: %s\n", buckets[bucket], aerr.Error())
+				case "AccessDenied":
+					log.Errorf("AccessDenied for bucket: %s (skipping)\n", buckets[bucket])
+					continue
+				case "AuthorizationHeaderMalformed":
+					log.Errorf("AuthorizationHeaderMalformed for bucket: %s (%s)\n", buckets[bucket], aerr.Error())
+				default:
+					log.Errorf("%s: %s\n", buckets[bucket], aerr.Error())
+				}
+			} else {
+				// Print the error, cast err to awserr.Error to get the Code and
+				// Message from an error.
+				log.Error(err.Error())
+			}
+		}
 
-        openPolicy := OpenPolicy(result.Policy)
-        if openPolicy {
-            pubBucket.Policy = append(pubBucket.Policy, buckets[bucket])
-        }
+		openPolicy := OpenPolicy(result.Policy)
+		if openPolicy {
+			pubBucket.Policy = append(pubBucket.Policy, buckets[bucket])
+		}
 
-        aclInput := &s3.GetBucketAclInput{}
-        aclInput.Bucket = aws.String(buckets[bucket])
+		aclInput := &s3.GetBucketAclInput{}
+		aclInput.Bucket = aws.String(buckets[bucket])
 
-        result2, err := svcTmp.GetBucketAcl(aclInput)
-        if err != nil {
-            continue
-        }
+		result2, err := svcTmp.GetBucketAcl(aclInput)
+		if err != nil {
+			continue
+		}
 
-        openACL := OpenACL(result2.Grants)
-        if openACL {
-            pubBucket.ACL = append(pubBucket.ACL, buckets[bucket])
-        }
-    }
+		openACL := OpenACL(result2.Grants)
+		if openACL {
+			pubBucket.ACL = append(pubBucket.ACL, buckets[bucket])
+		}
+	}
 
-    return pubBucket, nil
+	return pubBucket, nil
 }

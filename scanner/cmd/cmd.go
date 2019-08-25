@@ -35,6 +35,7 @@ var cfgPermutationsFile string
 var cfgAWSRegion string
 var cfgKeywords []string
 var cfgDomains []string
+var cfgGenerate bool
 
 var state string
 
@@ -54,6 +55,7 @@ type Config struct {
 	Keywords         []string
 	Domains          []string
 	Stats            *stats.Stats
+	Generate         bool
 }
 
 func setFlags() {
@@ -61,11 +63,13 @@ func setFlags() {
 	domainCmd.PersistentFlags().StringVarP(&cfgPermutationsFile, "permutations", "p", "./permutations.json", "Permutations file location")
 	domainCmd.PersistentFlags().BoolVarP(&cfgDebug, "debug", "d", false, "Debug output")
 	domainCmd.PersistentFlags().IntVarP(&cfgConcurrency, "concurrency", "c", 0, "Connection concurrency; default is the system CPU count")
+	domainCmd.PersistentFlags().BoolVarP(&cfgGenerate, "generate", "g", false, "Generate permutations and exit")
 
 	keywordCmd.PersistentFlags().StringSliceVarP(&cfgKeywords, "target", "t", []string{}, "List of keywords to enumerate s3; format: keyword1,keyword2,keyword3")
 	keywordCmd.PersistentFlags().StringVarP(&cfgPermutationsFile, "permutations", "p", "./permutations.json", "Permutations file location")
 	keywordCmd.PersistentFlags().BoolVarP(&cfgDebug, "debug", "d", false, "Debug output")
 	keywordCmd.PersistentFlags().IntVarP(&cfgConcurrency, "concurrency", "c", 0, "Connection concurrency; default is the system CPU count")
+	keywordCmd.PersistentFlags().BoolVarP(&cfgGenerate, "generate", "g", false, "Generate permutations and exit")
 
 	internalCmd.PersistentFlags().StringVarP(&cfgAWSRegion, "region", "r", "us-west-2", "AWS Region to connect to")
 	internalCmd.PersistentFlags().BoolVarP(&cfgDebug, "debug", "d", false, "Debug output")
@@ -164,5 +168,6 @@ func Init(useDesc, shortDesc, longDesc string) Config {
 		Keywords:         cfgKeywords,
 		Domains:          cfgDomains,
 		Stats:            stats.NewStats(),
+		Generate:         cfgGenerate,
 	}
 }
