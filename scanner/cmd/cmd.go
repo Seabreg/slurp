@@ -148,12 +148,13 @@ func Init(useDesc, shortDesc, longDesc string) Config {
 	// Check user supplied values for validity
 	if cfgConcurrency <= 0 {
 		cfgConcurrency = runtime.NumCPU()
-		log.Infof("Concurrency set to: %d", cfgConcurrency)
 	}
 
 	if cfgConcurrency > 512 {
 		log.Warning("Concurrency over 512 can result in errors in the scan, including a soft ban from Amazon")
 	}
+
+	log.Infof("Concurrency: %d", cfgConcurrency)
 
 	if helpFlag {
 		os.Exit(0)
