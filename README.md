@@ -38,6 +38,7 @@ In this mode, you are using the AWS API **with credentials** on a specific accou
 - `slurp domain <-t|--target> example.com` will enumerate the S3 domains for a specific target.
 - `slurp keyword <-t|--target> linux,golang,python` will enumerate S3 buckets based on those 3 key words.
 - `slurp internal` performs an internal scan using the AWS API.
+- `slurp mode <-t|--target> example.com -g >> file.txt` Export the permutation list. Write in a file.
 
 ## Installation
 This project uses `vgo`; you can clone and `go build` or download from Releases section. **Please do not open issues on why you cannot build the project**; this project builds like any other project would in Go, if you cannot build then I strongly suggest you read the [go spec](https://golang.org/ref/spec).
